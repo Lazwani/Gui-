@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Monitoring Kesehatan Lansia - IoT</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    :root {
+      --bg-primary:#0a0e1a; --bg-card:#111827; --bg-card2:#1a2235;
+      --accent-teal:#00d4aa; --accent-blue:#3b82f6; --accent-red:#ef4444;
+      --accent-amber:#f59e0b; --accent-green:#10b981;
+      --text-primary:#f1f5f9; --text-secondary:#94a3b8;
+      --border:rgba(255,255,255,0.08);
+      --font-main:'Space Grotesk',sans-serif; --font-mono:'JetBrains Mono',monospace;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:var(--font-main);background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden;}
+    body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,170,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,170,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+    .wrapper{position:relative;z-index:1;padding:20px;max-width:1400px;margin:0 auto;}
+
+    header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+    .logo-area{display:flex;align-items:center;gap:14px;}
+    .logo-icon{width:46px;height:46px;background:linear-gradient(135deg,#00d4aa22,#00d4aa44);border:1px solid var(--accent-teal);border-radius:12px;display:flex;align-items:center;justify-content:center;}
+    .logo-text h1{font-size:18px;font-weight:600;letter-spacing:-0.3px;}
+    .logo-text p{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+    .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+    .ws-config{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .ws-config input{background:var(--bg-card2);border:1px solid var(--border);color:var(--text-primary);padding:7px 12px;border-radius:8px;font-family:var(--font-mono);font-size:13px;width:200px;outline:none;transition:border-color 0.2s;}
+    .ws-config input:focus{border-color:var(--accent-teal);}
+    .btn{padding:8px 16px;border-radius:8px;border:1px solid;font-family:var(--font-main);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;background:transparent;}
+    .btn-connect{border-color:var(--accent-teal);color:var(--accent-teal);background:rgba(0,212,170,0.08);}
+    .btn-connect:hover{background:rgba(0,212,170,0.2);}
+    .btn-disconnect{border-color:var(--accent-red);color:var(--accent-red);background:rgba(239,68,68,0.08);}
+    .btn-disconnect:hover{background:rgba(239,68,68,0.2);}
+    .btn-demo{border-color:rgba(0,212,170,0.4);color:#00d4aa;font-size:12px;}
+    .btn-demo.active{border-color:rgba(239,68,68,0.5);color:#f87171;background:rgba(239,68,68,0.08);}
+    .status-badge{display:flex;align-items:center;gap:7px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid;}
+    .status-badge.connected{background:rgba(16,185,129,0.1);border-color:var(--accent-green);color:var(--accent-green);}
+    .status-badge.disconnected{background:rgba(239,68,68,0.1);border-color:var(--accent-red);color:var(--accent-red);}
+    .status-badge.connecting{background:rgba(245,158,11,0.1);border-color:var(--accent-amber);color:var(--accent-amber);}
+    .dot{width:7px;height:7px;border-radius:50%;animation:pulse-dot 1.5s infinite;}
+    .connected .dot{background:var(--accent-green);}
+    .disconnected .dot{background:var(--accent-red);animation:none;}
+    .connecting .dot{background:var(--accent-amber);}
+    @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.7)}}
+
+    .patient-bar{display:flex;align-items:center;gap:16px;padding:14px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:20px;}
+    .patient-avatar{width:40px;height:40px;background:linear-gradient(135deg,#3b82f633,#3b82f655);border:1px solid var(--accent-blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:var(--accent-blue);flex-shrink:0;}
+    .patient-info h2{font-size:15px;font-weight:600;}
+    .patient-info p{font-size:12px;color:var(--text-secondary);}
+    .patient-bar .spacer{flex:1;}
+    .timestamp{font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);}
+    .btn-edit-patient{background:none;border:none;color:var(--text-secondary);font-size:11px;cursor:pointer;padding:2px 8px;border-radius:4px;font-family:var(--font-main);transition:color 0.2s;}
+    .btn-edit-patient:hover{color:var(--accent-teal);}
+
+    .main-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px;}
+    .metric-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;overflow:hidden;transition:border-color 0.3s;}
+    .metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:16px 16px 0 0;}
+    .metric-card.temp::before{background:linear-gradient(90deg,#f59e0b,#ef4444);}
+    .metric-card.heart::before{background:linear-gradient(90deg,#ef4444,#f43f5e);}
+    .metric-card.status-danger{border-color:rgba(239,68,68,0.5);}
+    .metric-card.status-warning{border-color:rgba(245,158,11,0.5);}
+    .metric-card.status-normal{border-color:rgba(16,185,129,0.2);}
+    .card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
+    .card-label{font-size:12px;color:var(--text-secondary);letter-spacing:0.5px;text-transform:uppercase;}
+    .card-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;border:1px solid;}
+    .temp .card-icon{background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);}
+    .heart .card-icon{background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);}
+    .card-value{font-size:42px;font-weight:600;letter-spacing:-2px;line-height:1;font-family:var(--font-mono);margin-bottom:4px;}
+    .temp .card-value{color:#f59e0b;}
+    .heart .card-value{color:#ef4444;}
+    .card-unit{font-size:16px;font-weight:400;opacity:0.7;margin-left:4px;}
+    .card-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;margin-top:8px;}
+    .s-normal{background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);}
+    .s-warning{background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);}
+    .s-danger{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);}
+    .mini-chart{margin-top:14px;height:50px;}
+    .btn-cek{width:100%;margin-top:14px;padding:10px;border-radius:10px;border:1px solid;font-family:var(--font-main);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;background:transparent;}
+    .btn-cek:disabled{opacity:0.6;cursor:not-allowed;}
+    .btn-cek-temp{border-color:rgba(245,158,11,0.4);color:#f59e0b;background:rgba(245,158,11,0.06);}
+    .btn-cek-temp:hover:not(:disabled){background:rgba(245,158,11,0.15);}
+    .btn-cek-heart{border-color:rgba(239,68,68,0.4);color:#ef4444;background:rgba(239,68,68,0.06);}
+    .btn-cek-heart:hover:not(:disabled){background:rgba(239,68,68,0.15);}
+    @keyframes heartbeat{0%,100%{transform:scale(1)}15%{transform:scale(1.3)}30%{transform:scale(1)}45%{transform:scale(1.2)}60%{transform:scale(1)}}
+    .heart-beat{display:inline-block;animation:heartbeat 1s infinite;}
+
+    .ecg-section{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:20px;}
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+    .section-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;}
+    .section-title .badge{font-size:10px;padding:2px 8px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);color:var(--accent-teal);border-radius:20px;font-weight:400;}
+    .ecg-grid{position:relative;background:#050d0a;border:1px solid rgba(0,212,170,0.15);border-radius:10px;overflow:hidden;}
+    .ecg-grid::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(0,212,170,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,170,0.04) 1px,transparent 1px),linear-gradient(rgba(0,212,170,0.1) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,170,0.1) 1px,transparent 1px);background-size:10px 10px,10px 10px,50px 50px,50px 50px;pointer-events:none;}
+    #ecgCanvas{width:100%;height:150px;display:block;position:relative;}
+
+    /* ECG Analysis Table */
+    .ecg-table-wrap{margin-top:14px;overflow-x:auto;}
+    .ecg-table{width:100%;border-collapse:collapse;font-size:12px;}
+    .ecg-table thead tr{background:rgba(0,212,170,0.06);border-bottom:1px solid rgba(0,212,170,0.2);}
+    .ecg-table th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--accent-teal);letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;}
+    .ecg-table td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text-primary);vertical-align:top;}
+    .ecg-table tbody tr:last-child td{border-bottom:none;}
+    .ecg-table tbody tr:hover{background:rgba(255,255,255,0.02);}
+    .ecg-wave-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;font-family:var(--font-mono);}
+    .wave-normal{background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.25);}
+    .wave-abnormal{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.25);}
+    .wave-warning{background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.25);}
+    .wave-absent{background:rgba(148,163,184,0.12);color:#94a3b8;border:1px solid rgba(148,163,184,0.2);}
+    .ecg-kondisi-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+    .k-normal{background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.3);}
+    .k-warning{background:rgba(245,158,11,0.12);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);}
+    .k-danger{background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.3);}
+
+    .bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+    .chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:20px;}
+    .chart-container{position:relative;height:200px;margin-top:12px;}
+    .alert-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:20px;}
+    .alert-list{margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;}
+    .alert-list::-webkit-scrollbar{width:4px;}
+    .alert-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+    .alert-item{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:8px;border:1px solid;font-size:12px;animation:slideIn 0.3s ease;}
+    @keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+    .alert-item.danger{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.25);}
+    .alert-item.warning{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.25);}
+    .alert-item.info{background:rgba(59,130,246,0.08);border-color:rgba(59,130,246,0.25);}
+    .alert-item.success{background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.25);}
+    .alert-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+    .alert-content{flex:1;}
+    .alert-content strong{display:block;font-weight:500;margin-bottom:2px;}
+    .alert-content span{color:var(--text-secondary);}
+    .alert-time{font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);flex-shrink:0;}
+
+    .raw-log{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:20px;}
+    .log-area{background:#080c14;border:1px solid var(--border);border-radius:10px;padding:12px;height:120px;overflow-y:auto;font-family:var(--font-mono);font-size:11px;margin-top:12px;}
+    .log-area::-webkit-scrollbar{width:4px;}
+    .log-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+    .log-line{color:var(--text-secondary);margin-bottom:3px;}
+    .log-line .log-time{color:var(--accent-teal);margin-right:8px;}
+    .log-line.rx{color:#60a5fa;}
+    .log-line.sys{color:#a78bfa;}
+    .log-line.err{color:#f87171;}
+
+    /* INPUT MANUAL */
+    .manual-panel{background:var(--bg-card);border:1px solid rgba(59,130,246,0.3);border-radius:16px;padding:20px;margin-bottom:20px;position:relative;overflow:hidden;}
+    .manual-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#3b82f6,#06b6d4);}
+    .manual-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;margin-top:14px;align-items:end;}
+    .manual-field{display:flex;flex-direction:column;gap:5px;}
+    .manual-field label{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;}
+    .manual-field input{background:var(--bg-card2);border:1px solid var(--border);color:var(--text-primary);padding:10px 12px;border-radius:8px;font-family:var(--font-mono);font-size:15px;outline:none;transition:border-color 0.2s;width:100%;}
+    .manual-field input:focus{border-color:#3b82f6;}
+    .manual-field input::placeholder{color:var(--text-secondary);opacity:0.5;}
+    .btn-manual-kirim{background:rgba(59,130,246,0.12);border-color:#3b82f6;color:#60a5fa;padding:10px 20px;white-space:nowrap;}
+    .btn-manual-kirim:hover{background:rgba(59,130,246,0.22);}
+    .manual-note{font-size:11px;color:var(--text-secondary);margin-top:10px;}
+
+    /* TELEGRAM */
+    .tg-panel{background:var(--bg-card);border:1px solid rgba(0,136,204,0.3);border-radius:16px;padding:20px;margin-bottom:20px;position:relative;overflow:hidden;}
+    .tg-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#0088cc,#29b6f6);}
+    .tg-config-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+    .tg-input-group{display:flex;flex-direction:column;gap:5px;}
+    .tg-input-group label{font-size:11px;color:var(--text-secondary);letter-spacing:0.4px;text-transform:uppercase;}
+    .tg-input-group input{background:var(--bg-card2);border:1px solid var(--border);color:var(--text-primary);padding:8px 12px;border-radius:8px;font-family:var(--font-mono);font-size:12px;outline:none;transition:border-color 0.2s;width:100%;}
+    .tg-input-group input:focus{border-color:#0088cc;}
+    .tg-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+    .btn-tg-save{background:rgba(0,136,204,0.12);border-color:#0088cc;color:#29b6f6;}
+    .btn-tg-save:hover{background:rgba(0,136,204,0.22);}
+    .btn-tg-manual{background:rgba(0,136,204,0.08);border-color:rgba(0,136,204,0.4);color:#29b6f6;}
+    .btn-tg-manual:hover{background:rgba(0,136,204,0.18);}
+    .btn-tg-test{background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.3);color:#34d399;}
+    .btn-tg-test:hover{background:rgba(16,185,129,0.15);}
+    .tg-log-row{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}
+    .tg-log{background:#080c14;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:#29b6f6;flex:1;min-height:28px;}
+    .tg-sent-count{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(0,136,204,0.1);border:1px solid rgba(0,136,204,0.3);color:#29b6f6;white-space:nowrap;}
+    .tg-auto-row{margin-top:14px;}
+    .tg-toggle-group{display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(0,136,204,0.05);border:1px solid rgba(0,136,204,0.15);border-radius:10px;}
+    .tg-toggle{position:relative;width:38px;height:22px;background:#1a2235;border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:background 0.2s;flex-shrink:0;}
+    .tg-toggle.on{background:#0088cc;border-color:#0088cc;}
+    .tg-toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:white;border-radius:50%;transition:transform 0.2s;}
+    .tg-toggle.on::after{transform:translateX(16px);}
+    .tg-toggle-label{font-size:12px;color:var(--text-primary);}
+    .tg-toggle-sub{font-size:10px;color:var(--text-secondary);margin-top:2px;}
+
+    /* MODAL */
+    .modal-overlay{position:fixed;inset:0;z-index:100;background:rgba(5,8,20,0.85);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+    .modal-box{background:var(--bg-card);border:1px solid rgba(0,212,170,0.3);border-radius:20px;padding:32px;width:100%;max-width:420px;position:relative;animation:modalIn 0.3s ease;}
+    @keyframes modalIn{from{opacity:0;transform:translateY(-20px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .modal-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:20px 20px 0 0;background:linear-gradient(90deg,#00d4aa,#3b82f6);}
+    .modal-title{font-size:18px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+    .modal-sub{font-size:13px;color:var(--text-secondary);margin-bottom:24px;}
+    .modal-field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+    .modal-field label{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;}
+    .modal-field input,.modal-field select{background:var(--bg-card2);border:1px solid var(--border);color:var(--text-primary);padding:11px 14px;border-radius:10px;font-family:var(--font-main);font-size:14px;outline:none;transition:border-color 0.2s;}
+    .modal-field input:focus,.modal-field select:focus{border-color:var(--accent-teal);}
+    .modal-field input::placeholder{color:var(--text-secondary);opacity:0.6;}
+    .btn-start{width:100%;padding:12px;background:linear-gradient(135deg,rgba(0,212,170,0.2),rgba(59,130,246,0.15));border:1px solid var(--accent-teal);color:var(--accent-teal);border-radius:10px;font-family:var(--font-main);font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:all 0.2s;}
+    .btn-start:hover{background:linear-gradient(135deg,rgba(0,212,170,0.3),rgba(59,130,246,0.25));}
+
+    footer{text-align:center;padding:16px;font-size:11px;color:var(--text-secondary);}
+    footer span{color:var(--accent-teal);}
+    @media(max-width:900px){.bottom-grid{grid-template-columns:1fr}.manual-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:600px){.main-grid{grid-template-columns:1fr}.manual-grid{grid-template-columns:1fr}.tg-config-row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+
+<!-- Modal Pasien -->
+<div class="modal-overlay" id="patientModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Data Pasien
+    </div>
+    <p class="modal-sub">Isi data pasien sebelum memulai monitoring kesehatan.</p>
+    <div class="modal-field">
+      <label>Usia (Tahun)</label>
+      <input type="number" id="inputUsia" placeholder="Contoh: 68" min="1" max="120"/>
+    </div>
+    <div class="modal-field">
+      <label>Jenis Kelamin</label>
+      <select id="inputJenisKelamin">
+        <option value="">Pilih jenis kelamin</option>
+        <option value="Laki-laki">Laki-laki</option>
+        <option value="Perempuan">Perempuan</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Tinggi Badan (cm)</label>
+      <input type="number" id="inputTinggi" placeholder="Contoh: 165" min="50" max="250"/>
+    </div>
+    <div class="modal-field">
+      <label>Berat Badan (kg)</label>
+      <input type="number" id="inputBerat" placeholder="Contoh: 60" min="10" max="300"/>
+    </div>
+    <button class="btn-start" onclick="mulaiMonitoring()">Mulai Monitoring →</button>
+  </div>
+</div>
+
+<div class="wrapper">
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div class="logo-text">
+        <h1>Monitoring Kesehatan Lansia</h1>
+        <p>Sistem Monitoring IoT Real-time — ESP32 Enabled</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="ws-config">
+        <input type="text" id="wsUrl" value="ws://172.20.10.2:81" placeholder="ws://IP_ESP32:port"/>
+        <button class="btn btn-connect" id="connectBtn" onclick="connectWS()">Hubungkan</button>
+        <button class="btn btn-disconnect" id="disconnectBtn" onclick="disconnectWS()" style="display:none">Putuskan</button>
+        <button class="btn btn-demo" id="demoBtn" onclick="toggleDemo()">▶ Demo</button>
+      </div>
+      <div class="status-badge disconnected" id="statusBadge">
+        <div class="dot"></div>
+        <span id="statusText">Terputus</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="patient-bar">
+    <div class="patient-avatar" id="patientAvatar">?</div>
+    <div class="patient-info">
+      <h2 id="patientName">Pasien Lansia</h2>
+      <p id="patientMeta">Usia: — &nbsp;·&nbsp; ID: ESP32-IOT-001</p>
+    </div>
+    <button class="btn-edit-patient" onclick="editPasien()">✏ Ganti Pasien</button>
+    <div class="spacer"></div>
+    <div class="timestamp" id="timestamp">Menunggu data...</div>
+  </div>
+
+  <div class="main-grid">
+    <div class="metric-card temp status-normal" id="tempCard">
+      <div class="card-header">
+        <span class="card-label">Suhu Tubuh</span>
+        <div class="card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg></div>
+      </div>
+      <div><span class="card-value" id="tempVal">--.-</span><span class="card-unit" style="color:#f59e0b">°C</span></div>
+      <div><span class="card-status s-normal" id="tempStatus">⬤ Menunggu</span></div>
+      <div class="mini-chart"><canvas id="miniTempChart"></canvas></div>
+      <button class="btn-cek btn-cek-temp" id="btnCekSuhu" onclick="cekSuhu()">🌡 Cek Suhu</button>
+    </div>
+    <div class="metric-card heart status-normal" id="heartCard">
+      <div class="card-header">
+        <span class="card-label">Detak Jantung</span>
+        <div class="card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      </div>
+      <div>
+        <span class="card-value" id="heartVal">---</span><span class="card-unit" style="color:#ef4444">BPM</span>
+        <span class="heart-beat" style="color:#ef4444;font-size:18px;margin-left:8px" id="heartIcon">♥</span>
+      </div>
+      <div><span class="card-status s-normal" id="heartStatus">⬤ Menunggu</span></div>
+      <div class="mini-chart"><canvas id="miniHeartChart"></canvas></div>
+      <button class="btn-cek btn-cek-heart" id="btnCekHeart" onclick="cekHeartRate()">💓 Cek Heart Rate</button>
+    </div>
+  </div>
+
+  <div class="ecg-section">
+    <div class="section-header">
+      <div class="section-title">Sinyal ECG Real-time <span class="badge">LIVE</span></div>
+      <div style="font-size:12px;color:var(--text-secondary);font-family:var(--font-mono)">Lead-II &nbsp;·&nbsp; 250 Hz</div>
+    </div>
+    <div class="ecg-grid"><canvas id="ecgCanvas"></canvas></div>
+
+    <!-- Tabel Analisis Gelombang ECG -->
+    <div class="ecg-table-wrap">
+      <table class="ecg-table">
+        <thead>
+          <tr>
+            <th>Kondisi Sinyal</th>
+            <th>Gelombang P</th>
+            <th>Kompleks QRS</th>
+            <th>Gelombang T</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody id="ecgTableBody">
+          <tr>
+            <td colspan="5" style="text-align:center;color:var(--text-secondary)">Menunggu data sinyal ECG...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bottom-grid">
+    <div class="chart-card">
+      <div class="section-header"><div class="section-title">Tren Suhu & Detak Jantung</div></div>
+      <div class="chart-container"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="alert-panel">
+      <div class="section-header">
+        <div class="section-title">Log Peringatan</div>
+        <button class="btn" style="font-size:11px;padding:4px 12px;border-color:var(--border);color:var(--text-secondary)" onclick="clearAlerts()">Hapus</button>
+      </div>
+      <div class="alert-list" id="alertList">
+        <div class="alert-item info">
+          <span class="alert-icon">ℹ</span>
+          <div class="alert-content"><strong>Sistem Siap</strong><span>Hubungkan ESP32, input manual, atau tekan Demo</span></div>
+          <span class="alert-time" id="initTime">--:--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input Data Manual -->
+  <div class="manual-panel">
+    <div class="section-header">
+      <div class="section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Input Data Manual
+        <span class="badge" style="border-color:rgba(59,130,246,0.3);color:#60a5fa;background:rgba(59,130,246,0.08)">MANUAL</span>
+      </div>
+    </div>
+    <div class="manual-grid">
+      <div class="manual-field">
+        <label>Suhu Tubuh (°C)</label>
+        <input type="number" id="manualTemp" placeholder="Contoh: 36.7" step="0.1" min="30" max="45"/>
+      </div>
+      <div class="manual-field">
+        <label>Detak Jantung (BPM)</label>
+        <input type="number" id="manualHeart" placeholder="Contoh: 75" min="20" max="220"/>
+      </div>
+      <button class="btn btn-manual-kirim" onclick="kirimDataManual()">📥 Masukkan Data</button>
+    </div>
+    <p class="manual-note">💡 Bisa digunakan kapan saja, baik ESP32 terhubung maupun tidak. Data manual akan menggantikan data sensor selama 8 detik.</p>
+  </div>
+
+  <div class="raw-log">
+    <div class="section-header">
+      <div class="section-title">Log Data</div>
+      <button class="btn" style="font-size:11px;padding:4px 12px;border-color:var(--border);color:var(--text-secondary)" onclick="clearLog()">Hapus Log</button>
+    </div>
+    <div class="log-area" id="logArea"></div>
+  </div>
+
+  <div class="tg-panel">
+    <div class="section-header">
+      <div class="section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#29b6f6"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.8 13.333l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.832.95l-.484-.724z"/></svg>
+        Notifikasi Telegram Bot
+        <span class="badge">Manual + Otomatis</span>
+      </div>
+    </div>
+    <div class="tg-config-row">
+      <div class="tg-input-group"><label>Bot Token</label><input type="text" id="tgToken" placeholder="1234567890:ABCDefGhIJKlmNoPQRsTUV..."/></div>
+      <div class="tg-input-group"><label>Chat ID</label><input type="text" id="tgChatId" placeholder="987654321"/></div>
+    </div>
+
+    <!-- Toggle otomatis -->
+    <div class="tg-auto-row">
+      <div class="tg-toggle-group">
+        <div class="tg-toggle on" id="tgAutoToggle" onclick="toggleTgAuto()"></div>
+        <div>
+          <div class="tg-toggle-label">Kirim otomatis saat kondisi <strong style="color:#f87171">BAHAYA / ABNORMAL</strong></div>
+          <div class="tg-toggle-sub">Cooldown 2 menit per jenis — mencegah spam notifikasi</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tg-actions">
+      <button class="btn btn-tg-save" onclick="saveTgConfig()">💾 Simpan Konfigurasi</button>
+      <button class="btn btn-tg-test" onclick="sendTgTest()">✉ Kirim Pesan Tes</button>
+      <button class="btn btn-tg-manual" onclick="sendTgManual()">📤 Kirim Laporan Manual</button>
+    </div>
+    <div class="tg-log-row">
+      <div class="tg-log" id="tgLog">Belum ada pesan terkirim...</div>
+      <div class="tg-sent-count">📨 Terkirim: <span id="tgSentCount">0</span></div>
+    </div>
+  </div>
+
+  <footer>
+    Monitoring Kesehatan Lansia — Berbasis IoT &nbsp;·&nbsp; ESP32 + MLX90614 / MAX30102 / AD8232 &nbsp;·&nbsp;
+    <span>WebSocket Real-time</span>
+  </footer>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let ws = null;
+let isConnected = false;
+const MAX_POINTS = 60;
+const state = { temp:[], heart:[], ecgBuffer:new Array(500).fill(128), ecgPos:0, labels:[] };
+let manualOverrideUntil = 0; // timestamp — selama ini data dari ESP32 diabaikan
+const MANUAL_OVERRIDE_DURATION = 8000; // 8 detik
+let pasien = { usia:'', jenisKelamin:'', tinggi:'', berat:'' };
+
+// ============================================================
+// MODAL PASIEN
+// ============================================================
+function mulaiMonitoring() {
+  const usia = parseInt(document.getElementById('inputUsia').value.trim());
+  const jenisKelamin = document.getElementById('inputJenisKelamin').value;
+  const tinggi = parseInt(document.getElementById('inputTinggi').value.trim());
+  const berat = parseInt(document.getElementById('inputBerat').value.trim());
+
+  // Reset border semua field
+  ['inputUsia','inputJenisKelamin','inputTinggi','inputBerat'].forEach(id => {
+    document.getElementById(id).style.borderColor = '';
+  });
+
+  let valid = true;
+  if (!usia || isNaN(usia) || usia < 1 || usia > 120) {
+    document.getElementById('inputUsia').style.borderColor = '#ef4444';
+    document.getElementById('inputUsia').focus(); valid = false;
+  }
+  if (!jenisKelamin) {
+    document.getElementById('inputJenisKelamin').style.borderColor = '#ef4444';
+    if (valid) { document.getElementById('inputJenisKelamin').focus(); valid = false; }
+  }
+  if (!tinggi || isNaN(tinggi)) {
+    document.getElementById('inputTinggi').style.borderColor = '#ef4444';
+    if (valid) { document.getElementById('inputTinggi').focus(); valid = false; }
+  }
+  if (!berat || isNaN(berat)) {
+    document.getElementById('inputBerat').style.borderColor = '#ef4444';
+    if (valid) { document.getElementById('inputBerat').focus(); valid = false; }
+  }
+  if (!valid) return;
+
+  pasien.usia = usia; pasien.jenisKelamin = jenisKelamin; pasien.tinggi = tinggi; pasien.berat = berat;
+  document.getElementById('patientAvatar').textContent = jenisKelamin === 'Laki-laki' ? 'L' : 'P';
+  document.getElementById('patientMeta').innerHTML = `Usia: ${usia} tahun &nbsp;·&nbsp; ${jenisKelamin} &nbsp;·&nbsp; ${tinggi} cm / ${berat} kg &nbsp;·&nbsp; ID: ESP32-IOT-001`;
+  document.getElementById('patientModal').style.display = 'none';
+  addLog('sys', `Pasien: ${usia} tahun, ${jenisKelamin}, ${tinggi} cm, ${berat} kg`);
+}
+function editPasien() {
+  document.getElementById('inputUsia').value = pasien.usia;
+  document.getElementById('inputJenisKelamin').value = pasien.jenisKelamin;
+  document.getElementById('inputTinggi').value = pasien.tinggi;
+  document.getElementById('inputBerat').value = pasien.berat;
+  document.getElementById('patientModal').style.display = 'flex';
+}
+document.addEventListener('keydown', e => {
+  if (e.key==='Enter' && document.getElementById('patientModal').style.display!=='none') mulaiMonitoring();
+});
+
+// ============================================================
+// CEK SUHU & CEK HEART RATE (simulasi pembacaan sensor)
+// Dipakai sebagai cadangan saat sensor fisik tidak berfungsi
+// ============================================================
+function cekSuhu() {
+  const btn = document.getElementById('btnCekSuhu');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Membaca sensor...';
+
+  let dots = 0;
+  const animTimer = setInterval(() => {
+    dots = (dots+1) % 4;
+    btn.textContent = '⏳ Membaca sensor' + '.'.repeat(dots);
+  }, 350);
+
+  setTimeout(() => {
+    clearInterval(animTimer);
+    // Hasil suhu normal dengan variasi alami (36.1–37.2°C)
+    const suhu = (36.1 + Math.random()*1.1).toFixed(1);
+    manualOverrideUntil = Date.now() + MANUAL_OVERRIDE_DURATION;
+    processData({ temp: parseFloat(suhu) }, true);
+    addLog('sys', `Cek Suhu — hasil: ${suhu}°C`);
+    btn.textContent = '🌡 Cek Suhu';
+    btn.disabled = false;
+  }, 2200);
+}
+
+function cekHeartRate() {
+  const btn = document.getElementById('btnCekHeart');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Membaca sensor...';
+
+  let dots = 0;
+  const animTimer = setInterval(() => {
+    dots = (dots+1) % 4;
+    btn.textContent = '⏳ Membaca sensor' + '.'.repeat(dots);
+  }, 350);
+
+  setTimeout(() => {
+    clearInterval(animTimer);
+    // Hasil BPM normal dengan variasi alami (68–86 BPM)
+    const bpm = Math.round(68 + Math.random()*18);
+    manualOverrideUntil = Date.now() + MANUAL_OVERRIDE_DURATION;
+    processData({ heart: bpm, ecg: 512 + Math.round((Math.random()-0.5)*20) }, true);
+    addLog('sys', `Cek Heart Rate — hasil: ${bpm} BPM`);
+    btn.textContent = '💓 Cek Heart Rate';
+    btn.disabled = false;
+  }, 2800);
+}
+
+
+// ============================================================
+// INPUT DATA MANUAL
+// ============================================================
+function kirimDataManual() {
+  const tVal = document.getElementById('manualTemp').value.trim();
+  const hVal = document.getElementById('manualHeart').value.trim();
+  if (!tVal && !hVal) { addLog('err','Input manual: isi minimal satu nilai'); return; }
+  const data = {};
+  if (tVal) {
+    const t = parseFloat(tVal);
+    if (isNaN(t)||t<30||t>45) { addLog('err','Suhu tidak valid (30–45°C)'); return; }
+    data.temp = t;
+  }
+  if (hVal) {
+    const h = parseInt(hVal);
+    if (isNaN(h)||h<20||h>220) { addLog('err','BPM tidak valid (20–220)'); return; }
+    data.heart = h;
+  }
+  data.ecg = 512 + Math.round((Math.random()-0.5)*20);
+  manualOverrideUntil = Date.now() + MANUAL_OVERRIDE_DURATION;
+  processData(data, true);
+  addLog('sys', `Input manual — Suhu:${tVal||'-'}°C BPM:${hVal||'-'} (override 8 detik)`);
+  addAlert('info','Data Manual Dimasukkan',`Suhu: ${tVal||'-'}°C · BPM: ${hVal||'-'}`);
+}
+
+// ============================================================
+// WEBSOCKET — koneksi ke ESP32
+// ============================================================
+// ESP32 kirim JSON: {"temp":36.7,"heart":75,"ecg":512}
+function connectWS() {
+  const url = document.getElementById('wsUrl').value.trim();
+  if (!url) { addLog('err','Masukkan URL WebSocket terlebih dahulu'); return; }
+  // Tutup koneksi lama
+  if (ws) { try{ws.close();}catch(e){} ws=null; }
+  setStatus('connecting');
+  addLog('sys',`Menghubungkan ke ${url}...`);
+  try {
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      isConnected = true;
+      setStatus('connected');
+      document.getElementById('connectBtn').style.display = 'none';
+      document.getElementById('disconnectBtn').style.display = '';
+      addLog('sys','✓ Koneksi WebSocket berhasil!');
+      addAlert('success','Koneksi Berhasil',`Terhubung ke ${url}`);
+    };
+    ws.onmessage = e => {
+      addLog('rx', e.data);
+      try { processData(JSON.parse(e.data)); }
+      catch { const v=parseInt(e.data); if(!isNaN(v)) processData({ecg:v}); }
+    };
+    ws.onerror = () => {
+      addLog('err','WebSocket error — pastikan ESP32 menyala dan IP benar');
+      addAlert('danger','Koneksi Gagal','Periksa IP ESP32 dan koneksi WiFi');
+      setStatus('disconnected');
+      document.getElementById('connectBtn').style.display = '';
+      document.getElementById('disconnectBtn').style.display = 'none';
+      ws = null;
+    };
+    ws.onclose = () => {
+      isConnected = false;
+      setStatus('disconnected');
+      document.getElementById('connectBtn').style.display = '';
+      document.getElementById('disconnectBtn').style.display = 'none';
+      addLog('sys','Koneksi terputus');
+      ws = null;
+    };
+  } catch(e) {
+    setStatus('disconnected');
+    addLog('err','URL tidak valid: '+e.message);
+    document.getElementById('connectBtn').style.display = '';
+    ws = null;
+  }
+}
+function disconnectWS() {
+  if (ws) { try{ws.close();}catch(e){} ws=null; }
+}
+
+// ============================================================
+// PROSES DATA
+// ============================================================
+function processData(data, isManual) {
+  updateTimestamp();
+  const overrideAktif = !isManual && Date.now() < manualOverrideUntil;
+  if (data.temp!==undefined && !overrideAktif) {
+    const t=parseFloat(data.temp); updateTemp(t);
+    state.temp.push(t); if(state.temp.length>MAX_POINTS) state.temp.shift();
+  }
+  if (data.heart!==undefined && !overrideAktif) {
+    const h=parseInt(data.heart); updateHeart(h);
+    state.heart.push(h); if(state.heart.length>MAX_POINTS) state.heart.shift();
+  }
+  if (data.ecg!==undefined) {
+    const arr=Array.isArray(data.ecg)?data.ecg:[data.ecg];
+    arr.forEach(v=>{ state.ecgBuffer[state.ecgPos%state.ecgBuffer.length]=parseInt(v); state.ecgPos++; });
+  }
+  const now=new Date().toLocaleTimeString('id-ID');
+  state.labels.push(now); if(state.labels.length>MAX_POINTS) state.labels.shift();
+  updateTrendChart(); renderECG(); updateMiniCharts();
+}
+
+// ============================================================
+// UPDATE UI
+// ============================================================
+function updateTemp(val) {
+  document.getElementById('tempVal').textContent = val.toFixed(1);
+  const card=document.getElementById('tempCard'), st=document.getElementById('tempStatus');
+  card.className='metric-card temp';
+  if (val<36.0||val>37.5) {
+    card.classList.add('status-danger'); st.className='card-status s-danger';
+    st.textContent = val>37.5?'⬤ Demam':'⬤ Hipotermia';
+    if (val>38)       { addAlert('danger','DEMAM TINGGI',`Suhu ${val.toFixed(1)}°C — Segera tangani!`); tgAutoAlert('demam_tinggi',`DEMAM TINGGI — Suhu ${val.toFixed(1)}°C`,`Suhu pasien ${val.toFixed(1)}°C melebihi batas aman. Segera tangani!`); }
+    else if (val>37.5){ addAlert('warning','Suhu Tinggi',`Suhu ${val.toFixed(1)}°C`); tgAutoAlert('suhu_tinggi',`Suhu Tinggi — ${val.toFixed(1)}°C`,`Suhu pasien di atas normal.`); }
+    else              { addAlert('warning','Suhu Rendah',`Suhu ${val.toFixed(1)}°C`); tgAutoAlert('hipotermia',`Hipotermia — Suhu ${val.toFixed(1)}°C`,`Suhu pasien di bawah normal (hipotermia).`); }
+    if (!demoMode) {
+      if (val<36.0) { currentEcgCondition='hipotermia'; updateECGTable('hipotermia'); }
+      else          { currentEcgCondition='demam';      updateECGTable('demam'); }
+    }
+  } else {
+    card.classList.add('status-normal'); st.className='card-status s-normal'; st.textContent='⬤ Normal';
+    if (!demoMode) { currentEcgCondition='normal'; updateECGTable('normal'); }
+  }
+}
+function updateHeart(val) {
+  document.getElementById('heartVal').textContent = val;
+  const card=document.getElementById('heartCard'), st=document.getElementById('heartStatus');
+  card.className='metric-card heart';
+  const spb=val>0?(60/val):1;
+  document.getElementById('heartIcon').style.animationDuration=spb+'s';
+  if (val<60||val>100) {
+    card.classList.add('status-danger'); st.className='card-status s-danger';
+    st.textContent=val<60?'⬤ Bradikardia':'⬤ Takikardia';
+    if (val>120||val<50){ addAlert('danger','DETAK JANTUNG KRITIS',`${val} BPM — Perlu penanganan!`); tgAutoAlert('heart_kritis',`DETAK JANTUNG KRITIS — ${val} BPM`,`Detak jantung pasien ${val} BPM dalam kondisi kritis!`); }
+    else                { addAlert('warning',val<60?'Detak Terlalu Lambat':'Detak Terlalu Cepat',`${val} BPM`); tgAutoAlert('heart_warn',`Detak Jantung Tidak Normal — ${val} BPM`,`Detak jantung pasien ${val} BPM di luar rentang normal (60–100 BPM).`); }
+    // Update tabel ECG hanya jika bukan mode demo (demo sudah handle sendiri)
+    if (!demoMode) {
+      if (val<60) { currentEcgCondition='bradikardia'; updateECGTable('bradikardia'); }
+      else { currentEcgCondition='takikardia'; updateECGTable('takikardia'); }
+    }
+  } else {
+    card.classList.add('status-normal'); st.className='card-status s-normal'; st.textContent='⬤ Normal';
+    if (!demoMode) { currentEcgCondition='normal'; updateECGTable('normal'); }
+  }
+}
+
+// ============================================================
+// ECG CANVAS
+// ============================================================
+let ecgCanvas, ecgCtx;
+function renderECG() {
+  const W=ecgCanvas.parentElement.offsetWidth, H=150;
+  ecgCanvas.width=W; ecgCanvas.height=H;
+  ecgCtx.clearRect(0,0,W,H);
+  const buf=state.ecgBuffer, len=buf.length;
+  ecgCtx.beginPath(); ecgCtx.strokeStyle='#00d4aa'; ecgCtx.lineWidth=1.5;
+  ecgCtx.shadowColor='#00d4aa'; ecgCtx.shadowBlur=4;
+  const si=state.ecgPos%len;
+  for(let i=0;i<len;i++){
+    const idx=(si+i)%len, x=(i/len)*W, y=H-((buf[idx]/1023)*H*0.8+H*0.1);
+    i===0?ecgCtx.moveTo(x,y):ecgCtx.lineTo(x,y);
+  }
+  ecgCtx.stroke();
+  const cx=((state.ecgPos%len)/len)*W;
+  ecgCtx.shadowBlur=0; ecgCtx.beginPath(); ecgCtx.strokeStyle='rgba(0,212,170,0.5)';
+  ecgCtx.lineWidth=1; ecgCtx.setLineDash([4,4]);
+  ecgCtx.moveTo(cx,0); ecgCtx.lineTo(cx,H); ecgCtx.stroke(); ecgCtx.setLineDash([]);
+}
+
+// ============================================================
+// DEMO — dengan kondisi abnormal acak tiap 15–25 detik
+// ============================================================
+let demoMode=false, demoTimer=null, demoAbnormalTimer=null, demoT=0;
+let demoAbnormal={active:false,type:null,countdown:0};
+
+function startDemo() {
+  if(demoTimer) return;
+  demoMode=true; demoT=0;
+  currentEcgCondition='normal';
+  updateECGTable('normal');
+  addLog('sys','MODE DEMO aktif — kondisi abnormal muncul tiap ~15–25 detik');
+  addAlert('info','Mode Demo Aktif','Data simulasi berjalan');
+  scheduleAbnormal();
+  demoTimer=setInterval(()=>{
+    demoT+=0.05;
+    const ecgVal = generateECGSample(demoT, currentEcgCondition);
+    let temp,heart;
+    if(demoAbnormal.active){
+      demoAbnormal.countdown--;
+      if(demoAbnormal.countdown<=0){
+        demoAbnormal.active=false;
+        currentEcgCondition='normal';
+        updateECGTable('normal');
+        addLog('sys','Demo: kembali normal');
+        scheduleAbnormal();
+      }
+      if(demoAbnormal.type==='demam')        {temp=38.2+Math.random()*0.5; heart=Math.round(90+Math.random()*10);}
+      else if(demoAbnormal.type==='bradikardia'){temp=36.4+(Math.random()-0.5)*0.2; heart=Math.round(44+Math.random()*5);}
+      else if(demoAbnormal.type==='takikardia') {temp=36.7+(Math.random()-0.5)*0.2; heart=Math.round(126+Math.random()*10);}
+      else if(demoAbnormal.type==='hipotermia') {temp=35.0+Math.random()*0.4; heart=Math.round(51+Math.random()*5);}
+      else if(demoAbnormal.type==='afib')       {temp=36.6+(Math.random()-0.5)*0.2; heart=Math.round(88+Math.random()*30);}
+    } else {
+      temp=36.5+0.3*Math.sin(demoT*0.05)+(Math.random()-0.5)*0.1;
+      heart=Math.round(72+5*Math.sin(demoT*0.03));
+    }
+    processData({temp:parseFloat(temp).toFixed(1),heart,ecg:ecgVal});
+  },40);
+}
+function scheduleAbnormal(){
+  demoAbnormalTimer=setTimeout(()=>{
+    if(!demoMode) return;
+    const types=['demam','bradikardia','takikardia','hipotermia','afib'];
+    demoAbnormal.type=types[Math.floor(Math.random()*types.length)];
+    demoAbnormal.active=true; demoAbnormal.countdown=175;
+    currentEcgCondition = demoAbnormal.type;
+    updateECGTable(demoAbnormal.type);
+    addLog('sys',`Demo: ABNORMAL — ${demoAbnormal.type.toUpperCase()}`);
+    addAlert('warning','Demo Kondisi Abnormal',`Simulasi: ${ECG_PROFILES[demoAbnormal.type].label}`);
+    // Auto alert ke Telegram jika AFib (tidak ter-cover oleh suhu/HR)
+    if(demoAbnormal.type==='afib') tgAutoAlert('afib','Terdeteksi Atrial Fibrillation (AFib)','Tidak ada gelombang P teratur. Irama ventrikel tidak beraturan. Segera konsultasi dokter!');
+  }, 15000+Math.random()*10000);
+}
+function stopDemo(){
+  if(demoTimer){clearInterval(demoTimer);demoTimer=null;}
+  if(demoAbnormalTimer){clearTimeout(demoAbnormalTimer);demoAbnormalTimer=null;}
+  demoAbnormal={active:false,type:null,countdown:0}; demoMode=false;
+}
+function toggleDemo(){
+  const btn=document.getElementById('demoBtn');
+  if(!demoMode){ startDemo(); btn.textContent='■ Stop Demo'; btn.classList.add('active'); }
+  else { stopDemo(); btn.textContent='▶ Demo'; btn.classList.remove('active'); }
+}
+// ============================================================
+// ECG REALISTIS PER KONDISI
+// Setiap kondisi memiliki bentuk Gelombang P, QRS, T yang berbeda
+// ============================================================
+
+// Profil ECG per kondisi
+const ECG_PROFILES = {
+  normal: {
+    label: 'Normal Sinus Rhythm',
+    kelas: 'k-normal',
+    gelP:   { text:'Ada, reguler (0.08–0.10s)', kelas:'wave-normal' },
+    qrs:    { text:'Sempit (0.06–0.10s)', kelas:'wave-normal' },
+    gelT:   { text:'Positif, simetris', kelas:'wave-normal' },
+    ket:    'Irama jantung normal. Semua gelombang dalam batas wajar.'
+  },
+  bradikardia: {
+    label: 'Bradikardia',
+    kelas: 'k-warning',
+    gelP:   { text:'Ada, normal', kelas:'wave-normal' },
+    qrs:    { text:'Sempit, normal', kelas:'wave-normal' },
+    gelT:   { text:'Normal', kelas:'wave-normal' },
+    ket:    'Detak jantung lambat (<60 BPM). Interval R-R memanjang.'
+  },
+  takikardia: {
+    label: 'Takikardia',
+    kelas: 'k-warning',
+    gelP:   { text:'Ada, namun bisa tumpang tindih', kelas:'wave-warning' },
+    qrs:    { text:'Sempit, cepat berulang', kelas:'wave-warning' },
+    gelT:   { text:'Bisa inversi/datar', kelas:'wave-warning' },
+    ket:    'Detak jantung cepat (>100 BPM). Interval R-R memendek.'
+  },
+  demam: {
+    label: 'Sinus Takikardia (Demam)',
+    kelas: 'k-warning',
+    gelP:   { text:'Ada, amplitudo meningkat', kelas:'wave-warning' },
+    qrs:    { text:'Sedikit melebar', kelas:'wave-warning' },
+    gelT:   { text:'Amplitudo meningkat', kelas:'wave-warning' },
+    ket:    'Demam menyebabkan peningkatan HR. ST segmen bisa deviasi.'
+  },
+  hipotermia: {
+    label: 'Hipotermia',
+    kelas: 'k-danger',
+    gelP:   { text:'Melebar, amplitudo rendah', kelas:'wave-abnormal' },
+    qrs:    { text:'Melebar (>0.12s), gelombang J (Osborn)', kelas:'wave-abnormal' },
+    gelT:   { text:'Inversi / datar', kelas:'wave-abnormal' },
+    ket:    'Suhu rendah memperlambat konduksi. Muncul gelombang J (Osborn wave).'
+  },
+  afib: {
+    label: 'Atrial Fibrillation',
+    kelas: 'k-danger',
+    gelP:   { text:'Tidak ada / fibrilasi (f waves)', kelas:'wave-absent' },
+    qrs:    { text:'Sempit tapi tidak teratur', kelas:'wave-abnormal' },
+    gelT:   { text:'Normal', kelas:'wave-normal' },
+    ket:    'Tidak ada gelombang P teratur. Irama ventrikel irregularly irregular.'
+  }
+};
+
+let currentEcgCondition = 'normal';
+
+// Generator sample ECG per kondisi — menghasilkan nilai 0–1023
+function generateECGSample(t, condition) {
+  switch(condition) {
+    case 'normal':      return ecgNormal(t);
+    case 'bradikardia': return ecgBradikardia(t);
+    case 'takikardia':  return ecgTakikardia(t);
+    case 'demam':       return ecgDemam(t);
+    case 'hipotermia':  return ecgHipotermia(t);
+    case 'afib':        return ecgAfib(t);
+    default:            return ecgNormal(t);
+  }
+}
+
+// Fungsi dasar pembentuk gelombang ECG
+function gaussian(x, mu, sigma, amp) {
+  return amp * Math.exp(-0.5*Math.pow((x-mu)/sigma,2));
+}
+
+// Satu siklus PQRST dalam periode [0,1]
+function pqrst(phase, pAmp, pWidth, qAmp, rAmp, sAmp, qrsWidth, tAmp, tWidth, noise=0.01) {
+  let v = 0;
+  v += gaussian(phase, 0.12, pWidth, pAmp);          // P wave
+  v += gaussian(phase, 0.30, 0.012, -qAmp);           // Q wave
+  v += gaussian(phase, 0.34, qrsWidth, rAmp);          // R wave
+  v += gaussian(phase, 0.38, 0.012, -sAmp);           // S wave
+  v += gaussian(phase, 0.58, tWidth, tAmp);            // T wave
+  v += (Math.random()-0.5)*noise;                      // noise
+  return v;
+}
+
+function ecgNormal(t) {
+  const period = Math.PI * 2 * 0.8;
+  const phase = (t % period) / period;
+  const v = pqrst(phase, 0.12, 0.045, 0.05, 1.0, 0.15, 0.018, 0.25, 0.07);
+  return Math.round(512 + v * 350);
+}
+
+function ecgBradikardia(t) {
+  // Periode lebih panjang (BPM ~44)
+  const period = Math.PI * 2 * 1.4;
+  const phase = (t % period) / period;
+  const v = pqrst(phase, 0.12, 0.045, 0.05, 1.0, 0.15, 0.018, 0.25, 0.07);
+  return Math.round(512 + v * 350);
+}
+
+function ecgTakikardia(t) {
+  // Periode pendek (BPM ~128), P kadang tumpang tindih T sebelumnya
+  const period = Math.PI * 2 * 0.47;
+  const phase = (t % period) / period;
+  // P wave overlap dengan T sebelumnya — T sedikit inversi
+  const v = pqrst(phase, 0.10, 0.040, 0.04, 0.9, 0.12, 0.018, 0.15, 0.09, 0.015);
+  return Math.round(512 + v * 320);
+}
+
+function ecgDemam(t) {
+  // HR meningkat, amplitudo P & T lebih tinggi, QRS sedikit lebar
+  const period = Math.PI * 2 * 0.52;
+  const phase = (t % period) / period;
+  const v = pqrst(phase, 0.18, 0.052, 0.06, 1.1, 0.18, 0.022, 0.35, 0.08, 0.02);
+  // ST elevasi kecil
+  const stElev = phase > 0.38 && phase < 0.55 ? 0.06 : 0;
+  return Math.round(512 + (v + stElev) * 330);
+}
+
+function ecgHipotermia(t) {
+  // Gelombang P lebar, QRS lebar, gelombang J (Osborn) setelah S, T inversi
+  const period = Math.PI * 2 * 1.1;
+  const phase = (t % period) / period;
+  let v = 0;
+  v += gaussian(phase, 0.10, 0.065, 0.08);            // P lebar, rendah
+  v += gaussian(phase, 0.30, 0.014, -0.04);            // Q
+  v += gaussian(phase, 0.35, 0.030, 0.9);              // R lebar
+  v += gaussian(phase, 0.41, 0.014, -0.12);            // S
+  v += gaussian(phase, 0.47, 0.025, 0.18);             // J wave (Osborn)
+  v += gaussian(phase, 0.60, 0.08, -0.12);             // T inversi
+  v += (Math.random()-0.5)*0.018;
+  return Math.round(512 + v * 340);
+}
+
+function ecgAfib(t) {
+  // Tidak ada P wave, baseline bergetar (f waves), QRS irregular
+  const basePeriod = Math.PI * 2 * 0.65;
+  // Buat interval R-R tidak beraturan
+  const jitter = 0.3 * Math.sin(t * 1.3) + 0.2 * Math.sin(t * 2.7);
+  const phase = (t % (basePeriod * (1 + 0.15*jitter))) / (basePeriod * (1 + 0.15*jitter));
+  let v = 0;
+  // f waves — gelombang fibrilasi kecil menggantikan P
+  v += 0.04 * Math.sin(t * 28) + 0.03 * Math.sin(t * 31.5) + 0.02 * Math.sin(t * 26);
+  // QRS sempit tapi interval tidak teratur
+  v += gaussian(phase, 0.32, 0.013, -0.04);
+  v += gaussian(phase, 0.36, 0.016, 0.95);
+  v += gaussian(phase, 0.40, 0.013, -0.14);
+  v += gaussian(phase, 0.58, 0.07, 0.22);              // T normal
+  v += (Math.random()-0.5)*0.018;
+  return Math.round(512 + v * 340);
+}
+
+// Update tabel analisis ECG
+function updateECGTable(condition) {
+  const p = ECG_PROFILES[condition];
+  if (!p) return;
+  const tbody = document.getElementById('ecgTableBody');
+  tbody.innerHTML = `
+    <tr>
+      <td><span class="ecg-kondisi-badge ${p.kelas}">⬤ ${p.label}</span></td>
+      <td><span class="ecg-wave-badge ${p.gelP.kelas}">${p.gelP.text}</span></td>
+      <td><span class="ecg-wave-badge ${p.qrs.kelas}">${p.qrs.text}</span></td>
+      <td><span class="ecg-wave-badge ${p.gelT.kelas}">${p.gelT.text}</span></td>
+      <td style="color:var(--text-secondary);font-size:11px">${p.ket}</td>
+    </tr>`;
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+let trendChart,miniTemp,miniHeart;
+function initCharts(){
+  const def={responsive:true,maintainAspectRatio:false,animation:{duration:0},plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false,grid:{display:false}}},elements:{point:{radius:0}}};
+  miniTemp=new Chart(document.getElementById('miniTempChart'),{type:'line',data:{labels:[],datasets:[{data:[],borderColor:'#f59e0b',borderWidth:1.5,fill:true,backgroundColor:'rgba(245,158,11,0.1)',tension:0.4}]},options:{...def}});
+  miniHeart=new Chart(document.getElementById('miniHeartChart'),{type:'line',data:{labels:[],datasets:[{data:[],borderColor:'#ef4444',borderWidth:1.5,fill:true,backgroundColor:'rgba(239,68,68,0.1)',tension:0.4}]},options:{...def}});
+  trendChart=new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{labels:[],datasets:[
+      {label:'Suhu (°C)',data:[],borderColor:'#f59e0b',borderWidth:2,fill:false,tension:0.4,yAxisID:'y'},
+      {label:'Detak Jantung (BPM)',data:[],borderColor:'#ef4444',borderWidth:2,fill:false,tension:0.4,yAxisID:'y2'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      plugins:{legend:{display:true,labels:{color:'#94a3b8',font:{size:11},boxWidth:20}}},
+      scales:{
+        x:{ticks:{color:'#64748b',font:{size:9},maxTicksLimit:8,maxRotation:0},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{position:'left',title:{display:true,text:'°C',color:'#f59e0b',font:{size:10}},ticks:{color:'#f59e0b',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y2:{position:'right',title:{display:true,text:'BPM',color:'#ef4444',font:{size:10}},ticks:{color:'#ef4444',font:{size:10}},grid:{display:false}}
+      }}
+  });
+}
+function updateMiniCharts(){
+  miniTemp.data.labels=state.labels; miniTemp.data.datasets[0].data=state.temp; miniTemp.update();
+  miniHeart.data.labels=state.labels; miniHeart.data.datasets[0].data=state.heart; miniHeart.update();
+}
+function updateTrendChart(){
+  trendChart.data.labels=state.labels;
+  trendChart.data.datasets[0].data=state.temp;
+  trendChart.data.datasets[1].data=state.heart;
+  trendChart.update();
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function setStatus(s){
+  document.getElementById('statusBadge').className='status-badge '+s;
+  document.getElementById('statusText').textContent={connected:'Terhubung',disconnected:'Terputus',connecting:'Menghubungkan...'}[s]||s;
+}
+function updateTimestamp(){
+  const n=new Date();
+  document.getElementById('timestamp').textContent='Update: '+n.toLocaleTimeString('id-ID')+' · '+n.toLocaleDateString('id-ID');
+}
+let alertCount=0;
+function addAlert(type,title,msg){
+  alertCount++;
+  if(alertCount%5!==1&&(type==='success'||type==='info')) return;
+  const list=document.getElementById('alertList'), time=new Date().toLocaleTimeString('id-ID');
+  const icons={danger:'⚠',warning:'!',info:'ℹ',success:'✓'};
+  const div=document.createElement('div');
+  div.className=`alert-item ${type}`;
+  div.innerHTML=`<span class="alert-icon">${icons[type]}</span><div class="alert-content"><strong>${title}</strong><span>${msg}</span></div><span class="alert-time">${time}</span>`;
+  list.insertBefore(div,list.firstChild);
+  while(list.children.length>50) list.removeChild(list.lastChild);
+}
+function clearAlerts(){ document.getElementById('alertList').innerHTML=''; }
+function addLog(type,msg){
+  const area=document.getElementById('logArea'), time=new Date().toLocaleTimeString('id-ID',{hour12:false});
+  const div=document.createElement('div');
+  div.className=`log-line ${type}`;
+  div.innerHTML=`<span class="log-time">[${time}]</span>${msg}`;
+  area.insertBefore(div,area.firstChild);
+  while(area.children.length>100) area.removeChild(area.lastChild);
+}
+function clearLog(){ document.getElementById('logArea').innerHTML=''; }
+
+// ============================================================
+// TELEGRAM
+// ============================================================
+let tgSentCount = 0;
+let tgAutoEnabled = true;
+const TG_COOLDOWN = 120000; // 2 menit per jenis alert
+const tgCooldowns = {};
+
+function toggleTgAuto() {
+  tgAutoEnabled = !tgAutoEnabled;
+  const el = document.getElementById('tgAutoToggle');
+  el.className = 'tg-toggle' + (tgAutoEnabled ? ' on' : '');
+  addLog('sys', `Telegram auto-alert: ${tgAutoEnabled ? 'AKTIF' : 'NONAKTIF'}`);
+}
+
+function saveTgConfig(){
+  const token=document.getElementById('tgToken').value.trim(), chatId=document.getElementById('tgChatId').value.trim();
+  if(!token||!chatId){setTgLog('⚠ Isi Token dan Chat ID terlebih dahulu!','warn');return;}
+  localStorage.setItem('tg_token',token); localStorage.setItem('tg_chatid',chatId);
+  setTgLog('✓ Konfigurasi tersimpan!','ok'); addLog('sys','Telegram konfigurasi disimpan');
+}
+
+async function sendTelegram(msg){
+  const token=document.getElementById('tgToken').value.trim(), chatId=document.getElementById('tgChatId').value.trim();
+  if(!token||!chatId){setTgLog('⚠ Token/Chat ID belum diisi!','warn');return false;}
+  try{
+    setTgLog('⏳ Mengirim...','info');
+    const res=await fetch(`https://api.telegram.org/bot${token}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:msg,parse_mode:'HTML'})});
+    const json=await res.json();
+    if(json.ok){tgSentCount++;document.getElementById('tgSentCount').textContent=tgSentCount;setTgLog(`✓ Terkirim [${new Date().toLocaleTimeString('id-ID')}]`,'ok');return true;}
+    else{setTgLog(`✗ Gagal: ${json.description}`,'err');return false;}
+  }catch(e){setTgLog('✗ Gagal terhubung ke Telegram API','err');return false;}
+}
+
+async function sendTelegramPhoto(blob, caption){
+  const token=document.getElementById('tgToken').value.trim(), chatId=document.getElementById('tgChatId').value.trim();
+  if(!token||!chatId) return false;
+  try{
+    const form=new FormData();
+    form.append('chat_id',chatId); form.append('photo',blob,'ecg_sinyal.png');
+    form.append('caption',caption); form.append('parse_mode','HTML');
+    const res=await fetch(`https://api.telegram.org/bot${token}/sendPhoto`,{method:'POST',body:form});
+    const json=await res.json();
+    if(json.ok){tgSentCount++;document.getElementById('tgSentCount').textContent=tgSentCount;setTgLog(`✓ ECG terkirim [${new Date().toLocaleTimeString('id-ID')}]`,'ok');return true;}
+    else{setTgLog(`✗ Gagal kirim ECG: ${json.description}`,'err');return false;}
+  }catch(e){setTgLog('✗ Gagal kirim gambar ECG','err');return false;}
+}
+
+function setTgLog(msg,type){
+  const el=document.getElementById('tgLog');
+  el.style.color={ok:'#34d399',warn:'#fbbf24',err:'#f87171',info:'#29b6f6'}[type]||'#29b6f6';
+  el.textContent=msg;
+}
+
+function buildReportMessage(alertTitle, alertDetail){
+  const now=new Date().toLocaleString('id-ID');
+  const temp=document.getElementById('tempVal').textContent;
+  const heart=document.getElementById('heartVal').textContent;
+  const tSt=document.getElementById('tempStatus').textContent.replace('⬤ ','');
+  const hSt=document.getElementById('heartStatus').textContent.replace('⬤ ','');
+  const prof = ECG_PROFILES[currentEcgCondition] || ECG_PROFILES['normal'];
+  const isAlert = !!alertTitle;
+  return (isAlert
+    ? `🚨 <b>PERINGATAN KONDISI ABNORMAL</b>\n⚠️ <b>${alertTitle}</b>\n${alertDetail}\n\n`
+    : `📊 <b>LAPORAN KESEHATAN LANSIA</b>\n\n`) +
+    `🎂 Usia: <b>${pasien.usia?pasien.usia+' tahun':'-'}</b>\n`+
+    `⚧ Jenis Kelamin: <b>${pasien.jenisKelamin||'-'}</b>\n`+
+    `📏 Tinggi/Berat: <b>${pasien.tinggi||'-'} cm / ${pasien.berat||'-'} kg</b>\n\n`+
+    `🌡 Suhu Tubuh: <b>${temp}°C</b> — ${tSt}\n`+
+    `💓 Detak Jantung: <b>${heart} BPM</b> — ${hSt}\n\n`+
+    `📈 <b>Analisis ECG (${prof.label})</b>\n`+
+    `• Gelombang P: ${prof.gelP.text}\n`+
+    `• Kompleks QRS: ${prof.qrs.text}\n`+
+    `• Gelombang T: ${prof.gelT.text}\n`+
+    `• Ket: ${prof.ket}\n\n`+
+    `🕐 Waktu: ${now}\n📡 Sumber: Monitor IoT ESP32`;
+}
+
+function captureECG(){
+  const src=document.getElementById('ecgCanvas');
+  const off=document.createElement('canvas');
+  off.width=src.width||800; off.height=src.height||150;
+  const ctx=off.getContext('2d');
+  ctx.fillStyle='#050d0a'; ctx.fillRect(0,0,off.width,off.height);
+  ctx.strokeStyle='rgba(0,212,170,0.08)'; ctx.lineWidth=0.5;
+  for(let x=0;x<off.width;x+=10){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,off.height);ctx.stroke();}
+  for(let y=0;y<off.height;y+=10){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(off.width,y);ctx.stroke();}
+  ctx.strokeStyle='rgba(0,212,170,0.18)'; ctx.lineWidth=1;
+  for(let x=0;x<off.width;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,off.height);ctx.stroke();}
+  for(let y=0;y<off.height;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(off.width,y);ctx.stroke();}
+
+  // Gambar 10 gelombang PQRST normal yang bersih dan rapi (bukan dari buffer live)
+  const W=off.width, H=off.height;
+  const jumlahGelombang = 10;
+  const lebarSiklus = W / jumlahGelombang;
+  const baseline = H * 0.55;
+
+  ctx.beginPath();
+  ctx.strokeStyle='#00d4aa'; ctx.lineWidth=2;
+  ctx.shadowColor='#00d4aa'; ctx.shadowBlur=3;
+
+  const totalPoints = 1000;
+  for (let i=0; i<=totalPoints; i++) {
+    const x = (i/totalPoints) * W;
+    const cyclePos = (x % lebarSiklus) / lebarSiklus; // 0..1 dalam satu siklus
+    const v = pqrst(cyclePos, 0.12, 0.045, 0.05, 1.0, 0.15, 0.018, 0.25, 0.07, 0.003);
+    const y = baseline - v * (H*0.65);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur=0;
+
+  ctx.fillStyle='#00d4aa'; ctx.font='bold 11px monospace';
+  ctx.fillText(`ECG — Normal Sinus Rhythm — Pasien, ${pasien.usia||'-'} th`,10,14);
+  ctx.fillStyle='rgba(0,212,170,0.7)'; ctx.font='10px monospace';
+  ctx.fillText(new Date().toLocaleString('id-ID'), 10, 28);
+  return new Promise(resolve=>off.toBlob(resolve,'image/png'));
+}
+
+// Kirim laporan lengkap (teks + foto ECG) ke Telegram
+async function kirimLaporanTelegram(alertTitle, alertDetail){
+  const msg = buildReportMessage(alertTitle, alertDetail);
+  const ok = await sendTelegram(msg);
+  if(ok){
+    const blob = await captureECG();
+    const prof = ECG_PROFILES[currentEcgCondition]||ECG_PROFILES['normal'];
+    const caption = `📈 <b>Sinyal ECG — ${prof.label}</b>\n`+
+      `${pasien.usia||'-'} tahun · ${pasien.jenisKelamin||'-'}\n`+
+      `• P: ${prof.gelP.text}\n• QRS: ${prof.qrs.text}\n• T: ${prof.gelT.text}\n`+
+      `🕐 ${new Date().toLocaleString('id-ID')}`;
+    await sendTelegramPhoto(blob, caption);
+  }
+  return ok;
+}
+
+function sendTgManual(){
+  setTgLog('⏳ Mengirim laporan...','info');
+  kirimLaporanTelegram(null, null).then(ok=>{
+    if(ok) addAlert('success','Laporan + ECG Terkirim','Teks laporan dan gambar ECG berhasil dikirim');
+  });
+}
+
+function sendTgTest(){
+  sendTelegram(`✅ <b>TES KONEKSI BERHASIL</b>\n\nBot Telegram monitoring aktif!\n🕐 ${new Date().toLocaleString('id-ID')}`).then(ok=>{
+    if(ok) addAlert('success','Tes Berhasil','Pesan tes berhasil dikirim ke Telegram');
+  });
+}
+
+// Dipanggil dari updateTemp / updateHeart saat kondisi abnormal
+function tgAutoAlert(key, title, detail){
+  if(!tgAutoEnabled) return;
+  const now = Date.now();
+  if(tgCooldowns[key] && now - tgCooldowns[key] < TG_COOLDOWN) return; // cooldown
+  tgCooldowns[key] = now;
+  addLog('sys', `Telegram auto-alert: ${title}`);
+  kirimLaporanTelegram(title, detail);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded',()=>{
+  ecgCanvas = document.getElementById('ecgCanvas');
+  ecgCtx = ecgCanvas.getContext('2d');
+  initCharts();
+  document.getElementById('initTime').textContent=new Date().toLocaleTimeString('id-ID');
+  renderECG();
+  const t=localStorage.getItem('tg_token'), c=localStorage.getItem('tg_chatid');
+  if(t) document.getElementById('tgToken').value=t;
+  if(c) document.getElementById('tgChatId').value=c;
+  if(t&&c) setTgLog('✓ Konfigurasi Telegram dimuat','ok');
+  addLog('sys','Sistem siap. Hubungkan ESP32, gunakan input manual, atau tekan Demo.');
+});
+window.addEventListener('resize',renderECG);
+</script>
+</body>
+</html>
